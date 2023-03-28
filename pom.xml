@@ -83,6 +83,12 @@
       <optional>true</optional>
     </dependency>
     <dependency>
+      <groupId>org.apache.poi</groupId>
+      <artifactId>poi-ooxml</artifactId>
+      <version>${poi.version}</version>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
       <groupId>com.xeiam.xchart</groupId>
       <artifactId>xchart</artifactId>
       <version>${xchart.version}</version>

@@ -142,7 +142,9 @@ public class Index {
                 new Views.ListView<V>(df, false)
             );
     }
-
+    public Map<Object, Integer> getIndex(){
+        return this.index;
+    }
     public static <V> DataFrame<V> reset(final DataFrame<V> df) {
         final List<Object> index = new ArrayList<>(df.length());
         for (int i = 0; i < df.length(); i++) {

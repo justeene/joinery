@@ -18,51 +18,20 @@
 
 package joinery;
 
-import java.awt.Container;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.lang.reflect.Array;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.ListIterator;
-import java.util.Map;
-import java.util.Set;
-
 import com.codahale.metrics.annotation.Timed;
+import joinery.impl.*;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
-import joinery.impl.Aggregation;
-import joinery.impl.BlockManager;
-import joinery.impl.Combining;
-import joinery.impl.Comparison;
-import joinery.impl.Conversion;
-import joinery.impl.Display;
-import joinery.impl.Grouping;
-import joinery.impl.Index;
-import joinery.impl.Inspection;
-import joinery.impl.Pivoting;
-import joinery.impl.Selection;
-import joinery.impl.Serialization;
-import joinery.impl.Shaping;
-import joinery.impl.Shell;
-import joinery.impl.Sorting;
-import joinery.impl.SparseBitSet;
-import joinery.impl.Timeseries;
-import joinery.impl.Transforms;
-import joinery.impl.Views;
+import java.awt.*;
+import java.io.*;
+import java.lang.reflect.Array;
+import java.sql.*;
+import java.util.List;
+import java.util.*;
 
 /**
  * A data frame implementation in the spirit
@@ -114,9 +83,9 @@ import joinery.impl.Views;
  * @param <V> the type of values in this data frame
  */
 public class DataFrame<V>
-implements Iterable<List<V>> {
+        implements Iterable<List<V>> {
     private final Index index;
-    private final Index columns;
+    protected final Index columns;
     private final BlockManager<V> data;
     private final Grouping groups;
 
@@ -142,8 +111,8 @@ implements Iterable<List<V>> {
      *
      * @param columns the data frame column names.
      */
-    public DataFrame(final String ... columns) {
-        this(Arrays.asList((Object[])columns));
+    public DataFrame(final String... columns) {
+        this(Arrays.asList((Object[]) columns));
     }
 
     /**
@@ -173,7 +142,7 @@ implements Iterable<List<V>> {
      * > df.get("row1", "col1");
      * null }</pre>
      *
-     * @param index the row names
+     * @param index   the row names
      * @param columns the column names
      */
     public DataFrame(final Collection<?> index, final Collection<?> columns) {
@@ -201,17 +170,17 @@ implements Iterable<List<V>> {
     /**
      * Construct a new data frame using the specified data and indices.
      *
-     * @param index the row names
+     * @param index   the row names
      * @param columns the column names
-     * @param data the data
+     * @param data    the data
      */
     public DataFrame(final Collection<?> index, final Collection<?> columns,
-            final List<? extends List<? extends V>> data) {
+                     final List<? extends List<? extends V>> data) {
         final BlockManager<V> mgr = new BlockManager<V>(data);
         mgr.reshape(
                 Math.max(mgr.size(), columns.size()),
                 Math.max(mgr.length(), index.size())
-            );
+        );
 
         this.data = mgr;
         this.columns = new Index(columns, mgr.size());
@@ -228,7 +197,7 @@ implements Iterable<List<V>> {
 
     /**
      * Add new columns to the data frame.
-     *
+     * <p>
      * Any existing rows will have {@code null} values for the new columns.
      *
      * <pre> {@code
@@ -240,7 +209,7 @@ implements Iterable<List<V>> {
      * @param columns the new column names
      * @return the data frame with the columns added
      */
-    public DataFrame<V> add(final Object ... columns) {
+    public DataFrame<V> add(final Object... columns) {
         for (final Object column : columns) {
             final List<V> values = new ArrayList<V>(length());
             for (int r = 0; r < values.size(); r++) {
@@ -263,7 +232,7 @@ implements Iterable<List<V>> {
 
     /**
      * Add a new column to the data frame containing the value provided.
-     *
+     * <p>
      * Any existing rows with indices greater than the size of the
      * specified column data will have {@code null} values for the new column.
      *
@@ -288,7 +257,7 @@ implements Iterable<List<V>> {
      * Add the results of applying a row-wise
      * function to the data frame as a new column.
      *
-     * @param column the new column name
+     * @param column   the new column name
      * @param function the function to compute the new column values
      * @return the data frame with the column added
      */
@@ -311,7 +280,7 @@ implements Iterable<List<V>> {
      * @param cols the names of columns to be removed
      * @return a shallow copy of the data frame with the columns removed
      */
-    public DataFrame<V> drop(final Object ... cols) {
+    public DataFrame<V> drop(final Object... cols) {
         return drop(columns.indices(cols));
     }
 
@@ -326,7 +295,7 @@ implements Iterable<List<V>> {
      * @param cols the indices of the columns to be removed
      * @return a shallow copy of the data frame with the columns removed
      */
-    public DataFrame<V> drop(final Integer ... cols) {
+    public DataFrame<V> drop(final Integer... cols) {
         final List<Object> colnames = new ArrayList<>(columns.names());
         final List<Object> todrop = new ArrayList<>(cols.length);
         for (final int col : cols) {
@@ -343,7 +312,7 @@ implements Iterable<List<V>> {
                 index.names(),
                 colnames,
                 keep
-            );
+        );
     }
 
     public DataFrame<V> dropna() {
@@ -356,8 +325,8 @@ implements Iterable<List<V>> {
                 return select(new Selection.DropNaPredicate<V>());
             default:
                 return transpose()
-                       .select(new Selection.DropNaPredicate<V>())
-                       .transpose();
+                        .select(new Selection.DropNaPredicate<V>())
+                        .transpose();
         }
     }
 
@@ -382,7 +351,7 @@ implements Iterable<List<V>> {
      * @param cols the columns to include in the new data frame
      * @return a new data frame containing only the specified columns
      */
-    public DataFrame<V> retain(final Object ... cols) {
+    public DataFrame<V> retain(final Object... cols) {
         return retain(columns.indices(cols));
     }
 
@@ -397,7 +366,7 @@ implements Iterable<List<V>> {
      * @param cols the columns to include in the new data frame
      * @return a new data frame containing only the specified columns
      */
-    public DataFrame<V> retain(final Integer ... cols) {
+    public DataFrame<V> retain(final Integer... cols) {
         final Set<Integer> keep = new HashSet<Integer>(Arrays.asList(cols));
         final Integer[] todrop = new Integer[size() - keep.size()];
         for (int i = 0, c = 0; c < size(); c++) {
@@ -420,7 +389,7 @@ implements Iterable<List<V>> {
      * >   .index();
      * [alpha, bravo] }</pre>
      *
-     * @param col the column to use as the new index
+     * @param col  the column to use as the new index
      * @param drop true to remove the index column from the data, false otherwise
      * @return a new data frame with index specified
      */
@@ -465,7 +434,7 @@ implements Iterable<List<V>> {
      * @param cols the column to use as the new index
      * @return a new data frame with index specified
      */
-    public DataFrame<V> reindex(final Integer ... cols) {
+    public DataFrame<V> reindex(final Integer... cols) {
         return reindex(cols, true);
     }
 
@@ -481,7 +450,7 @@ implements Iterable<List<V>> {
      * >   .index();
      * [alpha, bravo] }</pre>
      *
-     * @param col the column to use as the new index
+     * @param col  the column to use as the new index
      * @param drop true to remove the index column from the data, false otherwise
      * @return a new data frame with index specified
      */
@@ -524,7 +493,7 @@ implements Iterable<List<V>> {
      * @param cols the column to use as the new index
      * @return a new data frame with index specified
      */
-    public DataFrame<V> reindex(final Object ... cols) {
+    public DataFrame<V> reindex(final Object... cols) {
         return reindex(columns.indices(cols), true);
     }
 
@@ -587,7 +556,7 @@ implements Iterable<List<V>> {
      * [row1, row2] }</pre>
      *
      * @param name the row name to add to the index
-     * @param row the row to append
+     * @param row  the row to append
      * @return the data frame with the new data appended
      */
     @Timed
@@ -671,7 +640,7 @@ implements Iterable<List<V>> {
      * using the row indices as the join key.
      *
      * @param other the other data frame
-     * @param join the join type
+     * @param join  the join type
      * @return the result of the join operation as a new data frame
      */
     public final DataFrame<V> join(final DataFrame<V> other, final JoinType join) {
@@ -683,7 +652,7 @@ implements Iterable<List<V>> {
      * data frame with the argument using the specified key function.
      *
      * @param other the other data frame
-     * @param on the function to generate the join keys
+     * @param on    the function to generate the join keys
      * @return the result of the join operation as a new data frame
      */
     public final DataFrame<V> join(final DataFrame<V> other, final KeyFunction<V> on) {
@@ -696,8 +665,8 @@ implements Iterable<List<V>> {
      * the specified key function.
      *
      * @param other the other data frame
-     * @param join the join type
-     * @param on the function to generate the join keys
+     * @param join  the join type
+     * @param on    the function to generate the join keys
      * @return the result of the join operation as a new data frame
      */
     public final DataFrame<V> join(final DataFrame<V> other, final JoinType join, final KeyFunction<V> on) {
@@ -709,10 +678,10 @@ implements Iterable<List<V>> {
      * this data frame with the argument using the column values as the join key.
      *
      * @param other the other data frame
-     * @param cols the indices of the columns to use as the join key
+     * @param cols  the indices of the columns to use as the join key
      * @return the result of the join operation as a new data frame
      */
-    public final DataFrame<V> joinOn(final DataFrame<V> other, final Integer ... cols) {
+    public final DataFrame<V> joinOn(final DataFrame<V> other, final Integer... cols) {
         return joinOn(other, JoinType.LEFT, cols);
     }
 
@@ -722,11 +691,11 @@ implements Iterable<List<V>> {
      * the column values as the join key.
      *
      * @param other the other data frame
-     * @param join the join type
-     * @param cols the indices of the columns to use as the join key
+     * @param join  the join type
+     * @param cols  the indices of the columns to use as the join key
      * @return the result of the join operation as a new data frame
      */
-    public final DataFrame<V> joinOn(final DataFrame<V> other, final JoinType join, final Integer ... cols) {
+    public final DataFrame<V> joinOn(final DataFrame<V> other, final JoinType join, final Integer... cols) {
         return Combining.joinOn(this, other, join, cols);
     }
 
@@ -735,10 +704,10 @@ implements Iterable<List<V>> {
      * this data frame with the argument using the column values as the join key.
      *
      * @param other the other data frame
-     * @param cols the names of the columns to use as the join key
+     * @param cols  the names of the columns to use as the join key
      * @return the result of the join operation as a new data frame
      */
-    public final DataFrame<V> joinOn(final DataFrame<V> other, final Object ... cols) {
+    public final DataFrame<V> joinOn(final DataFrame<V> other, final Object... cols) {
         return joinOn(other, JoinType.LEFT, cols);
     }
 
@@ -748,11 +717,11 @@ implements Iterable<List<V>> {
      * the column values as the join key.
      *
      * @param other the other data frame
-     * @param join the join type
-     * @param cols the names of the columns to use as the join key
+     * @param join  the join type
+     * @param cols  the names of the columns to use as the join key
      * @return the result of the join operation as a new data frame
      */
-    public final DataFrame<V> joinOn(final DataFrame<V> other, final JoinType join, final Object ... cols) {
+    public final DataFrame<V> joinOn(final DataFrame<V> other, final JoinType join, final Object... cols) {
         return joinOn(other, join, columns.indices(cols));
     }
 
@@ -788,7 +757,7 @@ implements Iterable<List<V>> {
      * @return this data frame with the overwritten values
      */
     @SafeVarargs
-    public final DataFrame<V> update(final DataFrame<? extends V> ... others) {
+    public final DataFrame<V> update(final DataFrame<? extends V>... others) {
         Combining.update(this, true, others);
         return this;
     }
@@ -813,7 +782,7 @@ implements Iterable<List<V>> {
      * @return the data frame containing all the values
      */
     @SafeVarargs
-    public final DataFrame<V> concat(final DataFrame<? extends V> ... others) {
+    public final DataFrame<V> concat(final DataFrame<? extends V>... others) {
         return Combining.concat(this, others);
     }
 
@@ -825,7 +794,7 @@ implements Iterable<List<V>> {
      * @return this data frame with the overwritten values
      */
     @SafeVarargs
-    public final DataFrame<V> coalesce(final DataFrame<? extends V> ... others) {
+    public final DataFrame<V> coalesce(final DataFrame<? extends V>... others) {
         Combining.update(this, false, others);
         return this;
     }
@@ -926,6 +895,9 @@ implements Iterable<List<V>> {
     public V get(final Object row, final Object col) {
         return get(index.get(row), columns.get(col));
     }
+    public V get(final Integer row, final Object col) {
+        return get(row, columns.get(col));
+    }
 
     /**
      * Return the value located by the (row, column) coordinates.
@@ -969,7 +941,7 @@ implements Iterable<List<V>> {
                 Selection.select(columns, slice[1]),
                 Selection.select(data, slice[0], slice[1]),
                 new Grouping()
-            );
+        );
     }
 
     /**
@@ -984,12 +956,15 @@ implements Iterable<List<V>> {
      * > df.col(1);
      * [7, null] }</pre>
      *
-     * @param row the row name
-     * @param col the column name
+     * @param row   the row name
+     * @param col   the column name
      * @param value the new value
      */
     public void set(final Object row, final Object col, final V value) {
         set(index.get(row), columns.get(col), value);
+    }
+    public void setI(final Integer row, final Object col, final V value) {
+        set(row, columns.get(col), value);
     }
 
     /**
@@ -1004,8 +979,8 @@ implements Iterable<List<V>> {
      * > df.col(0);
      * [null, 7] }</pre>
      *
-     * @param row the row index
-     * @param col the column index
+     * @param row   the row index
+     * @param col   the column index
      * @param value the new value
      */
     public void set(final Integer row, final Integer col, final V value) {
@@ -1126,7 +1101,7 @@ implements Iterable<List<V>> {
                 columns,
                 Selection.select(data, selected),
                 new Grouping()
-            );
+        );
     }
 
     /**
@@ -1166,9 +1141,9 @@ implements Iterable<List<V>> {
         return new DataFrame<>(
                 Selection.select(index, selected),
                 columns,
-                Selection.select(data,  selected),
+                Selection.select(data, selected),
                 new Grouping()
-            );
+        );
     }
 
     /**
@@ -1209,9 +1184,9 @@ implements Iterable<List<V>> {
         return new DataFrame<>(
                 Selection.select(index, selected),
                 columns,
-                Selection.select(data,  selected),
+                Selection.select(data, selected),
                 new Grouping()
-            );
+        );
     }
 
     /**
@@ -1253,7 +1228,7 @@ implements Iterable<List<V>> {
                 columns.names(),
                 index.names(),
                 new Views.ListView<>(this, true)
-            );
+        );
     }
 
     /**
@@ -1282,7 +1257,7 @@ implements Iterable<List<V>> {
                 index.names(),
                 columns.names(),
                 new Views.TransformedView<V, U>(this, function, false)
-            );
+        );
     }
 
     public <U> DataFrame<U> transform(final RowFunction<V, U> transform) {
@@ -1330,7 +1305,7 @@ implements Iterable<List<V>> {
     }
 
     public DataFrame<V> convert(final NumberDefault numDefault, final String naString) {
-        Conversion.convert(this,numDefault,naString);
+        Conversion.convert(this, numDefault, naString);
         return this;
     }
 
@@ -1356,7 +1331,7 @@ implements Iterable<List<V>> {
      * @return the data frame with the converted values
      */
     @SafeVarargs
-    public final DataFrame<V> convert(final Class<? extends V> ... columnTypes) {
+    public final DataFrame<V> convert(final Class<? extends V>... columnTypes) {
         Conversion.convert(this, columnTypes);
         return this;
     }
@@ -1430,11 +1405,11 @@ implements Iterable<List<V>> {
         if (array.length >= size() && array.length > 0 && array[0].length >= length()) {
             for (int c = 0; c < size(); c++) {
                 for (int r = 0; r < length(); r++) {
-                    array[r][c] = (U)get(r, c);
+                    array[r][c] = (U) get(r, c);
                 }
             }
         }
-        return (U[][])toArray(array.getClass());
+        return (U[][]) toArray(array.getClass());
     }
 
     /**
@@ -1443,8 +1418,8 @@ implements Iterable<List<V>> {
      * a two dimensional array, for example {@code double[][].class},
      * a row-wise copy will be made.
      *
-     * @throws IllegalArgumentException if the values are not assignable to the specified component type
      * @return the array
+     * @throws IllegalArgumentException if the values are not assignable to the specified component type
      */
     public <U> U toArray(final Class<U> cls) {
         int dim = 0;
@@ -1457,8 +1432,7 @@ implements Iterable<List<V>> {
         final int size = size();
         final int len = length();
         if (dim == 1) {
-            @SuppressWarnings("unchecked")
-            final U array = (U)Array.newInstance(type, size * len);
+            @SuppressWarnings("unchecked") final U array = (U) Array.newInstance(type, size * len);
             for (int c = 0; c < size; c++) {
                 for (int r = 0; r < len; r++) {
                     Array.set(array, c * len + r, data.get(c, r));
@@ -1466,8 +1440,7 @@ implements Iterable<List<V>> {
             }
             return array;
         } else if (dim == 2) {
-            @SuppressWarnings("unchecked")
-            final U array = (U)Array.newInstance(type, new int[] { len, size });
+            @SuppressWarnings("unchecked") final U array = (U) Array.newInstance(type, new int[]{len, size});
             for (int r = 0; r < len; r++) {
                 final Object aa = Array.get(array, r);
                 for (int c = 0; c < size; c++) {
@@ -1482,11 +1455,11 @@ implements Iterable<List<V>> {
     }
 
     /**
-     *  Encodes the DataFrame as a model matrix, converting nominal values
-     *  to dummy variables but does not add an intercept column.
-     *
-     *   More methods with additional parameters to control the conversion to
-     *   the model matrix are available in the <code>Conversion</code> class.
+     * Encodes the DataFrame as a model matrix, converting nominal values
+     * to dummy variables but does not add an intercept column.
+     * <p>
+     * More methods with additional parameters to control the conversion to
+     * the model matrix are available in the <code>Conversion</code> class.
      *
      * @param fillValue value to replace NA's with
      * @return a model matrix
@@ -1496,11 +1469,11 @@ implements Iterable<List<V>> {
     }
 
     /**
-     *  Encodes the DataFrame as a model matrix, converting nominal values
-     *  to dummy variables but does not add an intercept column.
-     *
-     *   More methods with additional parameters to control the conversion to
-     *   the model matrix are available in the <code>Conversion</code> class.
+     * Encodes the DataFrame as a model matrix, converting nominal values
+     * to dummy variables but does not add an intercept column.
+     * <p>
+     * More methods with additional parameters to control the conversion to
+     * the model matrix are available in the <code>Conversion</code> class.
      *
      * @return a model matrix
      */
@@ -1515,7 +1488,7 @@ implements Iterable<List<V>> {
      * @return the grouped data frame
      */
     @Timed
-    public DataFrame<V> groupBy(final Object ... cols) {
+    public DataFrame<V> groupBy(final Object... cols) {
         return groupBy(columns.indices(cols));
     }
 
@@ -1526,13 +1499,13 @@ implements Iterable<List<V>> {
      * @return the grouped data frame
      */
     @Timed
-    public DataFrame<V> groupBy(final Integer ... cols) {
+    public DataFrame<V> groupBy(final Integer... cols) {
         return new DataFrame<>(
                 index,
                 columns,
                 data,
                 new Grouping(this, cols)
-            );
+        );
     }
 
     /**
@@ -1548,7 +1521,7 @@ implements Iterable<List<V>> {
                 columns,
                 data,
                 new Grouping(this, function)
-            );
+        );
     }
 
     public Grouping groups() {
@@ -1571,7 +1544,7 @@ implements Iterable<List<V>> {
                     columns,
                     Selection.select(data, selected),
                     new Grouping()
-                ));
+            ));
         }
         return exploded;
     }
@@ -1773,10 +1746,10 @@ implements Iterable<List<V>> {
     @Timed
     public DataFrame<V> describe() {
         return Aggregation.describe(
-            groups.apply(this, new Aggregation.Describe<V>()));
+                groups.apply(this, new Aggregation.Describe<V>()));
     }
 
-    public DataFrame<V> pivot(final Object row, final Object col, final Object ... values) {
+    public DataFrame<V> pivot(final Object row, final Object col, final Object... values) {
         return pivot(Collections.singletonList(row), Collections.singletonList(col), Arrays.asList(values));
     }
 
@@ -1784,8 +1757,8 @@ implements Iterable<List<V>> {
         return pivot(columns.indices(rows), columns.indices(cols), columns.indices(values));
     }
 
-    public DataFrame<V> pivot(final Integer row, final Integer col, final Integer ... values) {
-        return pivot(new Integer[] { row }, new Integer[] { col }, values);
+    public DataFrame<V> pivot(final Integer row, final Integer col, final Integer... values) {
+        return pivot(new Integer[]{row}, new Integer[]{col}, values);
     }
 
     @Timed
@@ -1794,11 +1767,11 @@ implements Iterable<List<V>> {
     }
 
     @Timed
-    public <U> DataFrame<U> pivot(final KeyFunction<V> rows, final KeyFunction<V> cols, final Map<Integer, Aggregate<V,U>> values) {
+    public <U> DataFrame<U> pivot(final KeyFunction<V> rows, final KeyFunction<V> cols, final Map<Integer, Aggregate<V, U>> values) {
         return Pivoting.pivot(this, rows, cols, values);
     }
 
-    public DataFrame<V> sortBy(final Object ... cols) {
+    public DataFrame<V> sortBy(final Object... cols) {
         final Map<Integer, SortDirection> sortCols = new LinkedHashMap<>();
         for (final Object col : cols) {
             final String str = col instanceof String ? String.class.cast(col) : "";
@@ -1811,7 +1784,7 @@ implements Iterable<List<V>> {
     }
 
     @Timed
-    public DataFrame<V> sortBy(final Integer ... cols) {
+    public DataFrame<V> sortBy(final Integer... cols) {
         final Map<Integer, SortDirection> sortCols = new LinkedHashMap<>();
         for (final int c : cols) {
             final SortDirection dir = c < 0 ?
@@ -1926,7 +1899,7 @@ implements Iterable<List<V>> {
      */
     @SuppressWarnings("unchecked")
     public <T> DataFrame<T> cast(final Class<T> cls) {
-        return (DataFrame<T>)this;
+        return (DataFrame<T>) this;
     }
 
     /**
@@ -1975,11 +1948,11 @@ implements Iterable<List<V>> {
         return m;
     }
 
-    public DataFrame<V> unique(final Object ... cols) {
+    public DataFrame<V> unique(final Object... cols) {
         return unique(columns.indices(cols));
     }
 
-    public DataFrame<V> unique(final Integer ... cols) {
+    public DataFrame<V> unique(final Integer... cols) {
         final DataFrame<V> unique = new DataFrame<V>(columns.names());
         final Set<List<V>> seen = new HashSet<List<V>>();
 
@@ -2038,7 +2011,6 @@ implements Iterable<List<V>> {
      * > );
      * > df.plot();
      * } </pre>
-     *
      */
     public final void plot() {
         plot(PlotType.LINE);
@@ -2059,6 +2031,7 @@ implements Iterable<List<V>> {
      * > );
      * > df.plot(PlotType.AREA);
      * } </pre>
+     *
      * @param type the type of plot to display
      */
     public final void plot(final PlotType type) {
@@ -2080,7 +2053,7 @@ implements Iterable<List<V>> {
      * in the specified {@link Container} using the specified type.
      *
      * @param container the container to use for the chart
-     * @param type the type of plot to draw
+     * @param type      the type of plot to draw
      */
     public final void draw(final Container container, final PlotType type) {
         Display.draw(this, container, type);
@@ -2094,6 +2067,10 @@ implements Iterable<List<V>> {
         return Comparison.compare(df1, df2);
     }
 
+    public BlockManager<V> getData(){
+        return this.data;
+    }
+
     /**
      * Read the specified csv file and
      * return the data as a data frame.
@@ -2103,7 +2080,7 @@ implements Iterable<List<V>> {
      * @throws IOException if an error reading the file occurs
      */
     public static final DataFrame<Object> readCsv(final String file)
-    throws IOException {
+            throws IOException {
         return Serialization.readCsv(file);
     }
 
@@ -2116,52 +2093,52 @@ implements Iterable<List<V>> {
      * @throws IOException if an error reading the stream occurs
      */
     public static final DataFrame<Object> readCsv(final InputStream input)
-    throws IOException {
+            throws IOException {
         return Serialization.readCsv(input);
     }
 
     public static final DataFrame<Object> readCsv(final String file, final String separator)
-    throws IOException {
+            throws IOException {
         return Serialization.readCsv(file, separator, NumberDefault.LONG_DEFAULT);
     }
 
     public static final DataFrame<Object> readCsv(final InputStream input, final String separator)
-    throws IOException {
+            throws IOException {
         return Serialization.readCsv(input, separator, NumberDefault.LONG_DEFAULT, null);
     }
 
     public static final DataFrame<Object> readCsv(final InputStream input, final String separator, final String naString)
-    throws IOException {
+            throws IOException {
         return Serialization.readCsv(input, separator, NumberDefault.LONG_DEFAULT, naString);
     }
 
     public static final DataFrame<Object> readCsv(final InputStream input, final String separator, final String naString, final boolean hasHeader)
-    throws IOException {
+            throws IOException {
         return Serialization.readCsv(input, separator, NumberDefault.LONG_DEFAULT, naString, hasHeader);
     }
 
     public static final DataFrame<Object> readCsv(final String file, final String separator, final String naString, final boolean hasHeader)
-    throws IOException {
+            throws IOException {
         return Serialization.readCsv(file, separator, NumberDefault.LONG_DEFAULT, naString, hasHeader);
     }
 
     public static final DataFrame<Object> readCsv(final String file, final String separator, final NumberDefault numberDefault, final String naString, final boolean hasHeader)
-    throws IOException {
+            throws IOException {
         return Serialization.readCsv(file, separator, numberDefault, naString, hasHeader);
     }
 
     public static final DataFrame<Object> readCsv(final String file, final String separator, final NumberDefault longDefault)
-    throws IOException {
+            throws IOException {
         return Serialization.readCsv(file, separator, longDefault);
     }
 
     public static final DataFrame<Object> readCsv(final String file, final String separator, final NumberDefault longDefault, final String naString)
-    throws IOException {
+            throws IOException {
         return Serialization.readCsv(file, separator, longDefault, naString);
     }
 
     public static final DataFrame<Object> readCsv(final InputStream input, final String separator, final NumberDefault longDefault)
-    throws IOException {
+            throws IOException {
         return Serialization.readCsv(input, separator, longDefault, null);
     }
 
@@ -2173,7 +2150,7 @@ implements Iterable<List<V>> {
      * @throws IOException if an error occurs writing the file
      */
     public final void writeCsv(final String file)
-    throws IOException {
+            throws IOException {
         Serialization.writeCsv(this, new FileOutputStream(file));
     }
 
@@ -2185,7 +2162,7 @@ implements Iterable<List<V>> {
      * @throws IOException
      */
     public final void writeCsv(final OutputStream output)
-    throws IOException {
+            throws IOException {
         Serialization.writeCsv(this, output);
     }
 
@@ -2198,7 +2175,7 @@ implements Iterable<List<V>> {
      * @throws IOException if an error occurs reading the workbook
      */
     public static final DataFrame<Object> readXls(final String file)
-    throws IOException {
+            throws IOException {
         return Serialization.readXls(file);
     }
 
@@ -2211,7 +2188,7 @@ implements Iterable<List<V>> {
      * @throws IOException if an error occurs reading the input stream
      */
     public static final DataFrame<Object> readXls(final InputStream input)
-    throws IOException {
+            throws IOException {
         return Serialization.readXls(input);
     }
 
@@ -2223,7 +2200,7 @@ implements Iterable<List<V>> {
      * @throws IOException if an error occurs writing the file
      */
     public final void writeXls(final String file)
-    throws IOException {
+            throws IOException {
         Serialization.writeXls(this, new FileOutputStream(file));
     }
 
@@ -2231,11 +2208,11 @@ implements Iterable<List<V>> {
      * Write the data from the data frame
      * to the provided output stream as an excel workbook.
      *
-     * @param file the file to write
+     * @param output the file to write
      * @throws IOException if an error occurs writing the file
      */
     public final void writeXls(final OutputStream output)
-    throws IOException {
+            throws IOException {
         Serialization.writeXls(this, output);
     }
 
@@ -2249,13 +2226,13 @@ implements Iterable<List<V>> {
      * > DataFrame.readSql(c, "select * from data").flatten();
      * [test, 1] }</pre>
      *
-     * @param c the database connection
+     * @param c   the database connection
      * @param sql the SQL query
      * @return a new data frame
      * @throws SQLException if an error occurs execution the query
      */
     public static final DataFrame<Object> readSql(final Connection c, final String sql)
-    throws SQLException {
+            throws SQLException {
         try (Statement stmt = c.createStatement()) {
             return readSql(stmt.executeQuery(sql));
         }
@@ -2269,7 +2246,7 @@ implements Iterable<List<V>> {
      * @throws SQLException if an error occurs reading the results
      */
     public static final DataFrame<Object> readSql(final ResultSet rs)
-    throws SQLException {
+            throws SQLException {
         return Serialization.readSql(rs);
     }
 
@@ -2277,12 +2254,12 @@ implements Iterable<List<V>> {
      * Write the data from the data frame to a database by
      * executing the specified SQL statement.
      *
-     * @param c the database connection
+     * @param c   the database connection
      * @param sql the SQL statement
      * @throws SQLException if an error occurs executing the statement
      */
     public final void writeSql(final Connection c, final String sql)
-    throws SQLException {
+            throws SQLException {
         writeSql(c.prepareStatement(sql));
     }
 
@@ -2294,10 +2271,26 @@ implements Iterable<List<V>> {
      * @throws SQLException if an error occurs executing the statement
      */
     public final void writeSql(final PreparedStatement stmt)
-    throws SQLException {
+            throws SQLException {
         Serialization.writeSql(this, stmt);
     }
 
+
+    public final void setColumns(Object... newColumns) {
+        columns.getIndex().clear();
+        for(int i=0;i<newColumns.length;i++) {
+            columns.getIndex().put(newColumns[i],i);
+        }
+    }
+    public final void writeXlsx(String file) throws IOException {
+        Serialization.writeXlsx(this, new FileOutputStream(file));
+    }
+
+    public static final DataFrame<Object> readXlsx(String file, int titleIndex)
+            throws IOException {
+        return Serialization.readXlsx(file,titleIndex);
+    }
+    
     public final String toString(final int limit) {
         return Serialization.toString(this, limit);
     }
@@ -2346,7 +2339,8 @@ implements Iterable<List<V>> {
      * @see DataFrame#groupBy(KeyFunction)
      */
     public interface KeyFunction<I>
-    extends Function<List<I>, Object> { }
+            extends Function<List<I>, Object> {
+    }
 
     /**
      * A function that converts lists of {@linkplain DataFrame data frame}
@@ -2361,7 +2355,8 @@ implements Iterable<List<V>> {
      * @see DataFrame#aggregate(Aggregate)
      */
     public interface Aggregate<I, O>
-    extends Function<List<I>, O> { }
+            extends Function<List<I>, O> {
+    }
 
     /**
      * An interface used to filter a {@linkplain DataFrame data frame}.
@@ -2374,7 +2369,8 @@ implements Iterable<List<V>> {
      * @see DataFrame#select(Predicate)
      */
     public interface Predicate<I>
-    extends Function<List<I>, Boolean> { }
+            extends Function<List<I>, Boolean> {
+    }
 
     public enum SortDirection {
         ASCENDING,
@@ -2420,7 +2416,7 @@ implements Iterable<List<V>> {
 
     /**
      * Entry point to joinery as a command line tool.
-     *
+     * <p>
      * The available commands are:
      * <dl>
      *   <dt>show</dt><dd>display the specified data frame as a swing table</dd>
@@ -2433,7 +2429,7 @@ implements Iterable<List<V>> {
      * @throws IOException if an error occurs reading input
      */
     public static final void main(final String[] args)
-    throws IOException {
+            throws IOException {
         final List<DataFrame<Object>> frames = new ArrayList<>();
         for (int i = 1; i < args.length; i++) {
             frames.add(DataFrame.readCsv(args[i]));
@@ -2468,7 +2464,7 @@ implements Iterable<List<V>> {
         System.err.printf(
                 "usage: %s [compare|plot|show|shell] [csv-file ...]\n",
                 DataFrame.class.getCanonicalName()
-            );
+        );
         System.exit(255);
     }
 }

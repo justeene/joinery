@@ -73,5 +73,8 @@ public class BlockManager<V> {
     public int length() {
         return blocks.isEmpty() ? 0 : blocks.get(0).size();
     }
+    public List<List<V>> getBlocks(){
+        return this.blocks;
+    }
 }
 
